@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Flow — Configuración inicial</title>
+<title>Mi Norte — Configuración inicial</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -140,7 +140,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 <!-- ══════════ ONBOARDING ══════════ -->
 <div id="onboarding">
   <div id="ob-top">
-    <div class="ob-logo">flow<em>.</em></div>
+    <div class="ob-logo">Mi Norte<em>.</em></div>
     <div class="ob-step-lbl" id="ob-step-lbl">Paso 1 de 7</div>
   </div>
   <div id="ob-progress-wrap"><div id="ob-progress" style="width:14%"></div></div>
@@ -304,7 +304,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 <!-- ══════════ GENERATING ══════════ -->
 <div id="gen-screen">
   <div>
-    <div class="gen-logo">flow<em>.</em></div>
+    <div class="gen-logo">Mi Norte<em>.</em></div>
     <div style="color:var(--muted);font-size:13px;margin-bottom:2rem">Creando tu sistema personalizado…</div>
   </div>
   <div class="gen-spinner"></div>
@@ -320,7 +320,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 <!-- ══════════ PREVIEW ══════════ -->
 <div id="preview-screen">
   <div id="prev-top">
-    <div class="prev-title">flow<em>.</em> — Tu configuración</div>
+    <div class="prev-title">Mi Norte<em>.</em> — Tu configuración</div>
     <button class="ob-back" onclick="document.getElementById('preview-screen').classList.remove('on');document.getElementById('onboarding').style.display='flex';currentStep=7;showStep(7)">← Editar respuestas</button>
   </div>
   <div id="prev-body"></div>
@@ -601,7 +601,7 @@ async function callClaude() {
     schedule[hour].push(task);
   }
 
-  // Morning habits (before deep work)
+  // Morning habits (before deep work) — ALL days including weekends
   const morningHabits = OB.habits.filter(h => HABIT_MAP[h]?.time === 'morning');
   morningHabits.forEach((hName, i) => {
     const hData = HABIT_MAP[hName];
@@ -609,11 +609,11 @@ async function callClaude() {
       name: hData.name,
       cat:  findCatForHabit(hData.catMatch),
       pri:  hData.pri,
-      days: [0,1,2,3,4,5,6]
+      days: [0,1,2,3,4,5,6]  // every day including Sat & Sun
     });
   });
 
-  // Early work
+  // Early work (email, planning) — weekdays only
   const ewHabits = OB.habits.filter(h => HABIT_MAP[h]?.time === 'early_work');
   const ewHour = startH + morningHabits.length;
   ewHabits.forEach((hName, i) => {
@@ -651,14 +651,23 @@ async function callClaude() {
     addTask(afternoonH + 2, { name:'Revisión financiera', cat:finArea.id, pri:'Media', days:[1] }); // Martes
   }
 
-  // Evening habits
+  // Evening habits — ALL days including weekends
   const eveningHabits = OB.habits.filter(h => HABIT_MAP[h]?.time === 'evening');
   eveningHabits.forEach((hName, i) => {
     const hData = HABIT_MAP[hName];
     addTask(eveningStart + i, { name:hData.name, cat:findCatForHabit(hData.catMatch), pri:hData.pri, days:[0,1,2,3,4,5,6] });
   });
 
-  // Any remaining areas get a weekly block
+  // Weekend personal blocks — for areas not covered by weekday tasks
+  const weekendAreas = areas.filter(a => !/trabajo|carrera|negocio|emprend/i.test(a.name));
+  weekendAreas.forEach((a, i) => {
+    const wkndH = morningHabits.length + startH + i + 2;
+    if (wkndH <= endH) {
+      addTask(wkndH, { name:`Tiempo de ${a.name}`, cat:a.id, pri:'Media', days:[5,6] }); // Sat & Sun only
+    }
+  });
+
+  // Any remaining areas get a weekly block on weekdays
   areas.forEach((a, i) => {
     const hasTask = Object.values(schedule).some(tasks => tasks.some(t => t.cat === a.id));
     if (!hasTask) {
@@ -667,7 +676,7 @@ async function callClaude() {
     }
   });
 
-  // Night habits
+  // Night habits — ALL days
   const nightHabits = OB.habits.filter(h => HABIT_MAP[h]?.time === 'night');
   nightHabits.forEach((hName, i) => {
     const hData = HABIT_MAP[hName];
