@@ -475,85 +475,232 @@ async function generate() {
 function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
 async function callClaude() {
-  const areasList = OB.areas.map(a=>`- ${a.ico} ${a.name}: ${OB.goals[a.name]||'sin meta específica'}`).join('\n');
-  const prompt = `Eres un coach de productividad experto. Con base en el siguiente perfil de usuario, genera una configuración completa y personalizada para su sistema de productividad "Flow".
+  // ── Parse start hour from OB.startTime string ──
+  function parseStartHour(s) {
+    if (!s) return 7;
+    const m = s.match(/(\d+)/);
+    return m ? parseInt(m[1]) : 7;
+  }
+  function parseEndHour(s) {
+    if (!s) return 19;
+    if (s.includes('antes')) return 17;
+    if (s.includes('5pm') || s.includes('5pm')) return 19;
+    if (s.includes('7pm')) return 19;
+    if (s.includes('9pm')) return 21;
+    if (s.includes('11pm')) return 23;
+    const m = s.match(/(\d+)/);
+    return m ? parseInt(m[1]) + (parseInt(m[1]) < 12 ? 12 : 0) : 19;
+  }
+  function peakHours(peak) {
+    if (!peak) return [9, 10];
+    if (peak.includes('temprano')) return [6, 7, 8];
+    if (peak.includes('mañana') || peak.includes('Media mañana')) return [9, 10, 11];
+    if (peak.includes('almuerzo')) return [14, 15];
+    if (peak.includes('tarde') || peak.includes('noche')) return [17, 18, 19];
+    return [9, 10];
+  }
 
-PERFIL DEL USUARIO:
-- Nombre: ${OB.name}
-- Situación: ${OB.role||'no especificada'}
-- Hora de inicio del día: ${OB.startTime}
-- Hora de fin del día: ${OB.endTime}
-- Horas de mayor rendimiento: ${OB.peak||'no especificado'}
-- Hábitos que quiere integrar: ${OB.habits.join(', ')||'ninguno seleccionado'}
-- Contexto adicional: ${OB.context||'ninguno'}
+  const startH = parseStartHour(OB.startTime);
+  const endH   = parseEndHour(OB.endTime);
+  const peakH  = peakHours(OB.peak);
 
-ÁREAS DE VIDA Y METAS:
-${areasList}
+  // ── Area color palette ──
+  const PALETTES = [
+    {color:'#1A6E8A', bg:'#E6F4F8'},
+    {color:'#2E6B1A', bg:'#EDF6E8'},
+    {color:'#6B3A8A', bg:'#F3EAF8'},
+    {color:'#8A5C0A', bg:'#F8F1E6'},
+    {color:'#1A548A', bg:'#E6EFF8'},
+    {color:'#0A7A6E', bg:'#E6F5F3'},
+    {color:'#8A2E5C', bg:'#F8E6EF'},
+    {color:'#5C6B1A', bg:'#F1F3E6'},
+    {color:'#1A3E8A', bg:'#E6EBF8'},
+    {color:'#7A3A0A', bg:'#F8EDE6'},
+  ];
 
-Genera una respuesta SOLO en JSON válido (sin texto adicional, sin markdown, sin backticks) con esta estructura exacta:
-
-{
-  "areas": [
-    {
-      "id": "string_sin_espacios",
-      "name": "Nombre del área",
-      "icon": "emoji",
-      "color": "#hexcolor",
-      "bg": "#hexcolor_claro",
-      "yearGoal": "Meta concreta del año",
-      "q": [progreso_q1, progreso_q2, progreso_q3, progreso_q4]
-    }
-  ],
-  "weekSchedule": [
-    {
-      "hour": 7,
-      "tasks": [
-        {
-          "name": "Nombre de la tarea",
-          "cat": "id_del_area",
-          "pri": "Alta|Media|Baja",
-          "days": [0,1,2,3,4]
-        }
-      ]
-    }
-  ],
-  "quarterGoals": [
-    {"q": "Q1", "m": "Ene–Mar", "focus": "Objetivo del trimestre"},
-    {"q": "Q2", "m": "Abr–Jun", "focus": "Objetivo del trimestre"},
-    {"q": "Q3", "m": "Jul–Sep", "focus": "Objetivo del trimestre"},
-    {"q": "Q4", "m": "Oct–Dic", "focus": "Objetivo del trimestre"}
-  ],
-  "welcomeMsg": "Mensaje motivacional personalizado de 2 oraciones para ${OB.name}"
-}
-
-REGLAS IMPORTANTES:
-- Los colores deben ser tonos azules, verdes, púrpuras, ámbar o turquesa (claros y profesionales, NO oscuros ni negros)
-- El bg siempre debe ser una versión muy clara del color (añade F0 o E8 al final)
-- Los ids de área deben coincidir exactamente con los cat de weekSchedule
-- El horario debe respetar la hora de inicio (${OB.startTime}) y fin (${OB.endTime})
-- Distribuye los hábitos elegidos en los momentos más lógicos del día
-- Los hábitos de mañana van al inicio, los de noche al final
-- Incluye bloques de trabajo profundo en las horas pico (${OB.peak})
-- days: 0=Lunes hasta 6=Domingo. Los fines de semana (5,6) solo hábitos personales, no trabajo
-- Genera entre 8-12 bloques horarios con tareas
-- Las tareas de trabajo profundo deben aparecer en las horas de mayor rendimiento
-- El weekSchedule debe ser la semana IDEAL y repetible, no solo un día`;
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
-      messages: [{role:'user', content: prompt}]
-    })
+  // ── Build areas ──
+  const areas = OB.areas.map((a, i) => {
+    const pal = PALETTES[i % PALETTES.length];
+    const id  = a.name.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').slice(0,20);
+    return {
+      id,
+      name: a.name,
+      icon: a.ico || '🎯',
+      color: pal.color,
+      bg:    pal.bg,
+      yearGoal: OB.goals[a.name] || `Avanzar en ${a.name} este año`,
+      q: [0,0,0,0],
+      prog: 0
+    };
   });
 
-  if (!response.ok) throw new Error('API error');
-  const data = await response.json();
-  const raw = data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
-  const clean = raw.replace(/```json|```/g,'').trim();
-  return JSON.parse(clean);
+  // ── Map area names to ids ──
+  function findAreaId(name) {
+    const a = areas.find(x => x.name === name);
+    return a ? a.id : (areas[0] ? areas[0].id : 'personal');
+  }
+
+  // ── Habit → {name, cat, hour, pri} mapping ──
+  const HABIT_MAP = {
+    'Meditación':         { name:'Meditación',           catMatch:'Bienestar personal|Espiritualidad|Personal', pri:'Alta',  time:'morning' },
+    'Ejercicio':          { name:'Ejercicio',             catMatch:'Salud|fitness|Bienestar',                    pri:'Alta',  time:'morning' },
+    'Journaling':         { name:'Journaling',            catMatch:'Bienestar personal|Personal',                pri:'Media', time:'morning' },
+    'Lectura':            { name:'Lectura',               catMatch:'Aprendizaje',                                pri:'Media', time:'evening' },
+    'Podcast / aprendizaje':{ name:'Podcast / aprendizaje', catMatch:'Aprendizaje',                             pri:'Media', time:'morning' },
+    'Vitaminas / rutina salud':{ name:'Rutina de salud', catMatch:'Salud|fitness',                              pri:'Baja',  time:'morning' },
+    'Revisión de email':  { name:'Email & prioridades',  catMatch:'Trabajo|carrera',                            pri:'Media', time:'early_work' },
+    'Planificación del día':{ name:'Planificación del día',catMatch:'Trabajo|Personal',                         pri:'Alta',  time:'early_work' },
+    'Revisión financiera':{ name:'Revisión financiera',  catMatch:'Finanzas',                                   pri:'Media', time:'evening' },
+    'Rutina nocturna':    { name:'Rutina nocturna',      catMatch:'Bienestar personal|Personal',                pri:'Media', time:'night' },
+    'Tiempo en familia':  { name:'Tiempo en familia',    catMatch:'Familia|Relaciones',                         pri:'Alta',  time:'evening' },
+    'Preparación de comidas':{ name:'Preparación de comidas', catMatch:'Salud|Familia',                         pri:'Baja',  time:'evening' },
+  };
+
+  function findCatForHabit(catMatch) {
+    const keywords = catMatch.split('|');
+    for (const kw of keywords) {
+      const a = areas.find(x => x.name.toLowerCase().includes(kw.toLowerCase()));
+      if (a) return a.id;
+    }
+    return areas[0]?.id || 'personal';
+  }
+
+  // ── Build schedule ──
+  // Slot bucket → hours
+  const morningEnd   = Math.min(startH + 3, 10);
+  const earlyWorkH   = morningEnd;
+  const deepWorkH1   = peakH[0] || 10;
+  const deepWorkH2   = peakH[1] || 11;
+  const lunchH       = 12 + (startH >= 9 ? 1 : 0);
+  const afternoonH   = lunchH + 1;
+  const eveningStart = Math.max(endH - 2, 17);
+  const nightH       = Math.min(endH, 21);
+
+  function timeToHour(slot) {
+    const map = {
+      morning:    startH,
+      early_work: earlyWorkH,
+      deep1:      deepWorkH1,
+      deep2:      deepWorkH2,
+      lunch:      lunchH,
+      afternoon:  afternoonH,
+      evening:    eveningStart,
+      night:      nightH,
+    };
+    return map[slot] || startH;
+  }
+
+  // Start with fixed blocks
+  let schedule = {};  // hour → [{name, cat, pri, days}]
+
+  function addTask(hour, task) {
+    if (hour < startH || hour > endH) return;
+    if (!schedule[hour]) schedule[hour] = [];
+    schedule[hour].push(task);
+  }
+
+  // Morning habits (before deep work)
+  const morningHabits = OB.habits.filter(h => HABIT_MAP[h]?.time === 'morning');
+  morningHabits.forEach((hName, i) => {
+    const hData = HABIT_MAP[hName];
+    addTask(startH + i, {
+      name: hData.name,
+      cat:  findCatForHabit(hData.catMatch),
+      pri:  hData.pri,
+      days: [0,1,2,3,4,5,6]
+    });
+  });
+
+  // Early work
+  const ewHabits = OB.habits.filter(h => HABIT_MAP[h]?.time === 'early_work');
+  const ewHour = startH + morningHabits.length;
+  ewHabits.forEach((hName, i) => {
+    const hData = HABIT_MAP[hName];
+    addTask(ewHour + i, {
+      name: hData.name, cat: findCatForHabit(hData.catMatch), pri: hData.pri, days: [0,1,2,3,4]
+    });
+  });
+
+  // ── Work area tasks ──
+  const workArea = areas.find(a => /trabajo|carrera|negocio|emprend/i.test(a.name)) || areas[0];
+  const learnArea= areas.find(a => /aprend|estudio|educac/i.test(a.name));
+  const finArea  = areas.find(a => /finanz/i.test(a.name));
+
+  // Deep work blocks at peak hours
+  if (workArea) {
+    addTask(deepWorkH1, { name:'Trabajo profundo', cat:workArea.id, pri:'Alta', days:[0,1,2,3,4] });
+  }
+  if (deepWorkH2 && deepWorkH2 !== deepWorkH1) {
+    const area2 = learnArea || workArea;
+    if (area2) addTask(deepWorkH2, { name: learnArea ? 'Estudio / aprendizaje' : 'Trabajo profundo', cat:area2.id, pri:'Alta', days:[0,1,2,3,4] });
+  }
+
+  // Lunch
+  addTask(lunchH, { name:'Almuerzo & descanso', cat: findCatForHabit('Salud|Personal'), pri:'Baja', days:[0,1,2,3,4,5,6] });
+
+  // Afternoon work
+  if (workArea) {
+    addTask(afternoonH, { name:'Reuniones & comunicación', cat:workArea.id, pri:'Media', days:[0,1,2,3,4] });
+    addTask(afternoonH + 1, { name:'Revisión del día & tareas pendientes', cat:workArea.id, pri:'Media', days:[0,1,2,3,4] });
+  }
+
+  // Finances
+  if (finArea) {
+    addTask(afternoonH + 2, { name:'Revisión financiera', cat:finArea.id, pri:'Media', days:[1] }); // Martes
+  }
+
+  // Evening habits
+  const eveningHabits = OB.habits.filter(h => HABIT_MAP[h]?.time === 'evening');
+  eveningHabits.forEach((hName, i) => {
+    const hData = HABIT_MAP[hName];
+    addTask(eveningStart + i, { name:hData.name, cat:findCatForHabit(hData.catMatch), pri:hData.pri, days:[0,1,2,3,4,5,6] });
+  });
+
+  // Any remaining areas get a weekly block
+  areas.forEach((a, i) => {
+    const hasTask = Object.values(schedule).some(tasks => tasks.some(t => t.cat === a.id));
+    if (!hasTask) {
+      const h = eveningStart + eveningHabits.length + i;
+      addTask(h, { name:`Avance — ${a.name}`, cat:a.id, pri:'Media', days:[0,2,4] });
+    }
+  });
+
+  // Night habits
+  const nightHabits = OB.habits.filter(h => HABIT_MAP[h]?.time === 'night');
+  nightHabits.forEach((hName, i) => {
+    const hData = HABIT_MAP[hName];
+    addTask(nightH + i, { name:hData.name, cat:findCatForHabit(hData.catMatch), pri:hData.pri, days:[0,1,2,3,4,5,6] });
+  });
+
+  // Convert to weekSchedule array, sorted by hour
+  const weekSchedule = Object.entries(schedule)
+    .filter(([,tasks]) => tasks.length > 0)
+    .sort(([a],[b]) => parseInt(a)-parseInt(b))
+    .map(([hour, tasks]) => ({ hour: parseInt(hour), tasks }));
+
+  // ── Quarter goals ──
+  const curQ = Math.floor(new Date().getMonth() / 3);
+  const qFocusTemplates = [
+    'Establecer bases y hábitos clave',
+    'Construir momentum y primeros resultados',
+    'Consolidar logros y escalar',
+    'Cerrar el año fuerte y planificar el siguiente'
+  ];
+  const quarterGoals = [
+    { q:'Q1', m:'Ene–Mar', focus: curQ===0 ? `${OB.name}: arrancar con fuerza — ${areas[0]?.yearGoal||qFocusTemplates[0]}` : qFocusTemplates[0] },
+    { q:'Q2', m:'Abr–Jun', focus: qFocusTemplates[1] + (areas[1] ? ` — enfoque en ${areas[1].name}` : '') },
+    { q:'Q3', m:'Jul–Sep', focus: qFocusTemplates[2] + (areas[2] ? ` — profundizar en ${areas[2].name}` : '') },
+    { q:'Q4', m:'Oct–Dic', focus: qFocusTemplates[3] },
+  ];
+
+  // ── Welcome message ──
+  const roleMsg = OB.role ? `Como ${OB.role.toLowerCase()}, ` : '';
+  const areaCount = areas.length;
+  const welcomeMsg = `${roleMsg}tu sistema está diseñado para ayudarte a crecer en ${areaCount} área${areaCount>1?'s':''} clave de tu vida. Cada día que registres tu avance estarás un paso más cerca de la versión de ti que quieres ser.`;
+
+  return { areas, weekSchedule, quarterGoals, welcomeMsg };
 }
 
 /* ═══ PREVIEW ═══ */
