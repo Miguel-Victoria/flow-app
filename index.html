@@ -634,21 +634,21 @@ async function callClaude() {
   }
   if (deepWorkH2 && deepWorkH2 !== deepWorkH1) {
     const area2 = learnArea || workArea;
-    if (area2) addTask(deepWorkH2, { name: learnArea ? 'Estudio / aprendizaje' : 'Trabajo profundo', cat:area2.id, pri:'Alta', days:[0,1,2,3,4] });
+    if (area2) addTask(deepWorkH2, { name: learnArea ? 'Estudio' : 'Proyecto', cat:area2.id, pri:'Alta', days:[0,1,2,3,4] });
   }
 
   // Lunch
-  addTask(lunchH, { name:'Almuerzo & descanso', cat: findCatForHabit('Salud|Personal'), pri:'Baja', days:[0,1,2,3,4,5,6] });
+  addTask(lunchH, { name:'Almuerzo', cat: findCatForHabit('Salud|Personal'), pri:'Baja', days:[0,1,2,3,4,5,6] });
 
   // Afternoon work
   if (workArea) {
-    addTask(afternoonH, { name:'Reuniones & comunicación', cat:workArea.id, pri:'Media', days:[0,1,2,3,4] });
-    addTask(afternoonH + 1, { name:'Revisión del día & tareas pendientes', cat:workArea.id, pri:'Media', days:[0,1,2,3,4] });
+    addTask(afternoonH,   { name:'Reuniones', cat:workArea.id, pri:'Media', days:[0,1,2,3,4] });
+    addTask(afternoonH+1, { name:'Revisión del día', cat:workArea.id, pri:'Media', days:[0,1,2,3,4] });
   }
 
   // Finances
   if (finArea) {
-    addTask(afternoonH + 2, { name:'Revisión financiera', cat:finArea.id, pri:'Media', days:[1] }); // Martes
+    addTask(afternoonH + 2, { name:'Finanzas', cat:finArea.id, pri:'Media', days:[1] });
   }
 
   // Evening habits — ALL days including weekends
@@ -663,7 +663,7 @@ async function callClaude() {
   weekendAreas.forEach((a, i) => {
     const wkndH = morningHabits.length + startH + i + 2;
     if (wkndH <= endH) {
-      addTask(wkndH, { name:`Tiempo de ${a.name}`, cat:a.id, pri:'Media', days:[5,6] }); // Sat & Sun only
+      addTask(wkndH, { name: a.name.split(' ')[0], cat:a.id, pri:'Media', days:[5,6] });
     }
   });
 
@@ -672,7 +672,7 @@ async function callClaude() {
     const hasTask = Object.values(schedule).some(tasks => tasks.some(t => t.cat === a.id));
     if (!hasTask) {
       const h = eveningStart + eveningHabits.length + i;
-      addTask(h, { name:`Avance — ${a.name}`, cat:a.id, pri:'Media', days:[0,2,4] });
+      addTask(h, { name: a.name.split(' ')[0], cat:a.id, pri:'Media', days:[0,2,4] });
     }
   });
 
@@ -689,20 +689,64 @@ async function callClaude() {
     .sort(([a],[b]) => parseInt(a)-parseInt(b))
     .map(([hour, tasks]) => ({ hour: parseInt(hour), tasks }));
 
-  // ── Quarter goals ──
-  const curQ = Math.floor(new Date().getMonth() / 3);
-  const qFocusTemplates = [
-    'Establecer bases y hábitos clave',
-    'Construir momentum y primeros resultados',
-    'Consolidar logros y escalar',
-    'Cerrar el año fuerte y planificar el siguiente'
+  // ── Quarter goals — only from current quarter forward ──
+  const today = new Date();
+  const curQ  = Math.floor(today.getMonth() / 3);  // 0=Q1 1=Q2 2=Q3 3=Q4
+  const curYear = today.getFullYear();
+  const nextYear = curYear + 1;
+
+  // How many quarters remain this year (including current)?
+  const remainingQs = 4 - curQ;  // e.g. if curQ=2 (Q3) → 2 remain
+
+  const ALL_Q = [
+    { q:'Q1', m:'Ene–Mar', yr: curYear },
+    { q:'Q2', m:'Abr–Jun', yr: curYear },
+    { q:'Q3', m:'Jul–Sep', yr: curYear },
+    { q:'Q4', m:'Oct–Dic', yr: curYear },
   ];
-  const quarterGoals = [
-    { q:'Q1', m:'Ene–Mar', focus: curQ===0 ? `${OB.name}: arrancar con fuerza — ${areas[0]?.yearGoal||qFocusTemplates[0]}` : qFocusTemplates[0] },
-    { q:'Q2', m:'Abr–Jun', focus: qFocusTemplates[1] + (areas[1] ? ` — enfoque en ${areas[1].name}` : '') },
-    { q:'Q3', m:'Jul–Sep', focus: qFocusTemplates[2] + (areas[2] ? ` — profundizar en ${areas[2].name}` : '') },
-    { q:'Q4', m:'Oct–Dic', focus: qFocusTemplates[3] },
+  const NEXT_Q = [
+    { q:'Q1', m:'Ene–Mar', yr: nextYear },
+    { q:'Q2', m:'Abr–Jun', yr: nextYear },
+    { q:'Q3', m:'Jul–Sep', yr: nextYear },
+    { q:'Q4', m:'Oct–Dic', yr: nextYear },
   ];
+
+  // Build focus phrases using area goals
+  const areaGoalFor = (idx) => areas[idx % areas.length]?.yearGoal || '';
+  const shortGoal   = (g)   => g.length > 40 ? g.slice(0, 38) + '…' : g;
+
+  let quarterGoals = [];
+
+  if (remainingQs <= 1) {
+    // Near end of year (Q4 or Dec) → add current Q + all next year
+    if (remainingQs === 1) {
+      quarterGoals.push({ q: ALL_Q[curQ].q, m: ALL_Q[curQ].m + ' ' + curYear,
+        focus: `Cerrar ${curYear} fuerte — ${shortGoal(areaGoalFor(0))}` });
+    }
+    quarterGoals.push(
+      { q:'Q1', m:`Ene–Mar ${nextYear}`, focus: `Arrancar con fuerza — ${shortGoal(areaGoalFor(0))}` },
+      { q:'Q2', m:`Abr–Jun ${nextYear}`, focus: `Construir momentum — ${shortGoal(areaGoalFor(1))}` },
+      { q:'Q3', m:`Jul–Sep ${nextYear}`, focus: `Consolidar logros — ${shortGoal(areaGoalFor(2))}` },
+      { q:'Q4', m:`Oct–Dic ${nextYear}`, focus: `Cierre y planificación ${nextYear + 1}` },
+    );
+  } else {
+    // Still quarters left this year — show only from curQ onward
+    for (let qi = curQ; qi < 4; qi++) {
+      const qData = ALL_Q[qi];
+      const focuses = [
+        `Arrancar fuerte — ${shortGoal(areaGoalFor(0))}`,
+        `Construir momentum — ${shortGoal(areaGoalFor(1))}`,
+        `Consolidar logros — ${shortGoal(areaGoalFor(2))}`,
+        `Cierre del año — ${shortGoal(areaGoalFor(3))}`,
+      ];
+      quarterGoals.push({ q: qData.q, m: qData.m, focus: focuses[qi] });
+    }
+    // If only showing 1 or 2 quarters, pad with next year's Q1
+    if (remainingQs <= 2) {
+      quarterGoals.push({ q:'Q1', m:`Ene–Mar ${nextYear}`,
+        focus: `Nuevo año — ${shortGoal(areaGoalFor(0))}` });
+    }
+  }
 
   // ── Welcome message ──
   const roleMsg = OB.role ? `Como ${OB.role.toLowerCase()}, ` : '';

@@ -392,6 +392,33 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:.65rem
   </div>
 </div>
 
+<!-- EDIT TASK OVERLAY -->
+<div class="overlay hidden" id="edit-task-ov">
+  <div class="modal">
+    <div class="modal-title">Editar tarea</div>
+    <div class="modal-sub" id="edit-task-sub"></div>
+    <div class="modal-form-row">
+      <div class="fl">Nombre</div>
+      <input class="fi" id="edit-task-name" onkeydown="if(event.key==='Enter')confirmEditTask()" style="margin-top:4px">
+    </div>
+    <div class="modal-form-row">
+      <div class="fl">Categoría</div>
+      <select class="fi" id="edit-task-cat" style="margin-top:4px"></select>
+    </div>
+    <div class="modal-form-row">
+      <div class="fl">Prioridad</div>
+      <select class="fi" id="edit-task-pri" style="margin-top:4px">
+        <option>Alta</option><option>Media</option><option>Baja</option>
+      </select>
+    </div>
+    <div class="modal-acts" style="gap:6px;flex-wrap:wrap">
+      <button class="btn-ghost" onclick="deleteEditTask()" style="flex:1;color:var(--red);border-color:var(--red-bg)">Eliminar</button>
+      <button class="btn-ghost" onclick="closeEditTask()">Cancelar</button>
+      <button class="btn-ok"    onclick="confirmEditTask()" style="flex:2">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 /* ═══ CONSTANTS ═══ */
@@ -413,7 +440,7 @@ const S = {
     {id:'trabajo',  name:'Trabajo',         icon:'💼', color:'#2F80C7', bg:'#EAF3FB', prog:55, yearGoal:'Cerrar 3 proyectos clave',     q:[100,50,0,0]},
     {id:'personal', name:'Personal',        icon:'🌱', color:'#5C8A0A', bg:'#F3FBEA', prog:40, yearGoal:'Hábitos de bienestar diarios', q:[70,45,0,0]},
   ],
-  selPct:null, activeCI:null, addSlot:null, addDaySlot:null, perfChart:null,
+  selPct:null, activeCI:null, addSlot:null, addDaySlot:null, editTaskSlot:null, perfChart:null,
   viewDate: new Date(),  // which day is shown in Today view
   viewWeekOffset: 0,     // week offset for week view (0 = current week)
   mockW:[72,85,60,90,55,78,82],
@@ -506,6 +533,7 @@ function renderToday(){
         <div class="t-left">${dot}<span class="t-name">${t.name}</span>${cat}</div>
         <div class="t-right">
           <button class="t-badge ${pctClass(t.pct)}" onclick="openCI('${wk}',${dI},${h},${i})">${pctDisplay(t.pct)}</button>
+          <button onclick="openEditTask('${wk}',${dI},${h},${i},'day')" style="background:transparent;border:none;color:var(--dim);cursor:pointer;font-size:14px;line-height:1;padding:0 2px" title="Editar">✏️</button>
         </div>
       </div>`;
     }).join('');
@@ -539,6 +567,42 @@ function confirmAddDay(){
   const{wk,dI,h}=S.addDaySlot;
   getSlot(wk,dI,h).push({name,cat:document.getElementById('add-day-cat').value,pri:document.getElementById('add-day-pri').value,pct:null});
   closeAddDay();renderToday();
+}
+
+/* ═══ EDIT TASK ═══ */
+function openEditTask(wk,dI,h,idx,source){
+  S.editTaskSlot={wk,dI,h,idx,source};
+  const t=getSlot(wk,dI,h)[idx];
+  document.getElementById('edit-task-sub').textContent=hFull(h);
+  document.getElementById('edit-task-name').value=t.name;
+  const sel=document.getElementById('edit-task-cat');
+  sel.innerHTML='<option value="">Sin categoría</option>'+S.areas.map(a=>`<option value="${a.id}">${a.icon} ${a.name}</option>`).join('');
+  sel.value=t.cat||'';
+  const priSel=document.getElementById('edit-task-pri');
+  priSel.value=t.pri||'Media';
+  document.getElementById('edit-task-ov').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('edit-task-name').focus(),80);
+}
+function closeEditTask(){document.getElementById('edit-task-ov').classList.add('hidden');S.editTaskSlot=null;}
+function confirmEditTask(){
+  if(!S.editTaskSlot)return;
+  const{wk,dI,h,idx,source}=S.editTaskSlot;
+  const name=document.getElementById('edit-task-name').value.trim();
+  if(!name)return;
+  const t=getSlot(wk,dI,h)[idx];
+  t.name=name;
+  t.cat=document.getElementById('edit-task-cat').value;
+  t.pri=document.getElementById('edit-task-pri').value;
+  closeEditTask();
+  if(source==='week')renderWeek(); else renderToday();
+}
+function deleteEditTask(){
+  if(!S.editTaskSlot)return;
+  const{wk,dI,h,idx,source}=S.editTaskSlot;
+  if(!confirm('¿Eliminar esta tarea?'))return;
+  getSlot(wk,dI,h).splice(idx,1);
+  closeEditTask();
+  if(source==='week')renderWeek(); else renderToday();
 }
 
 /* ═══ WEEK NAVIGATION ═══ */
@@ -577,7 +641,7 @@ function renderWeek(){
         return `<div class="wc-chip" style="background:${bg}">
           <div class="wc-chip-dot" style="background:${col}"></div>
           <span class="wc-chip-name" style="color:${col}" title="${t.name}">${t.name}</span>
-          <button class="wc-chip-del" onclick="delTask('${wk}',${d},${h},${i},event)">×</button>
+          <button class="wc-chip-del" onclick="openEditTask('${wk}',${d},${h},${i},'week');event.stopPropagation()" title="Editar">✏</button>
         </div>`;
       }).join('');
       html+=`<td class="${isT?'today-c':''}" onclick="openPanel('${wk}',${d},${h},event)">
@@ -684,19 +748,26 @@ function renderPlans(){
         <div class="yg-bar"><div class="yg-fill" style="width:${a.prog}%;background:${a.color}"></div></div>
       </div>
     </div>`).join('');
-  const qLabels=['Q1 · Ene–Mar','Q2 · Abr–Jun','Q3 · Jul–Sep','Q4 · Oct–Dic'];
-  const curQ=Math.floor(new Date().getMonth()/3);
-  document.getElementById('q-grid').innerHTML=qLabels.map((ql,qi)=>{
+  const today2=new Date(), curQ2=Math.floor(today2.getMonth()/3), curYr=today2.getFullYear();
+  const nextYr=curYr+1;
+  const allQ=[{q:'Q1',m:'Ene–Mar'},{q:'Q2',m:'Abr–Jun'},{q:'Q3',m:'Jul–Sep'},{q:'Q4',m:'Oct–Dic'}];
+  let qItems=[];
+  for(let qi=curQ2;qi<4;qi++){
     const qAvg=Math.round(S.areas.reduce((a,ar)=>a+(ar.q[qi]||0),0)/S.areas.length);
-    const isCur=qi===curQ;
-    return `<div class="q-card${isCur?' cur':''}">
-      ${isCur?'<div class="q-badge">Ahora</div>':''}
-      <div class="q-lbl">${ql}</div>
-      <div class="q-title">${qAvg>=80?'En buen camino':qAvg>0?'En progreso':'Por comenzar'}</div>
-      <div class="q-bar"><div class="q-fill" style="width:${qAvg}%;background:${isCur?'var(--blue)':'var(--dim)'}"></div></div>
-      <div class="q-meta">${qAvg}% promedio</div>
-    </div>`;
-  }).join('');
+    qItems.push({q:allQ[qi].q,m:allQ[qi].m+' '+curYr,avg:qAvg,cur:qi===curQ2});
+  }
+  if(4-curQ2<=2){
+    qItems.push({q:'Q1',m:`Ene–Mar ${nextYr}`,avg:0,cur:false,next:true});
+    if(4-curQ2<=1) qItems.push({q:'Q2',m:`Abr–Jun ${nextYr}`,avg:0,cur:false,next:true});
+  }
+  document.getElementById('q-grid').innerHTML=qItems.map(qi=>`
+    <div class="q-card${qi.cur?' cur':''}">
+      ${qi.cur?'<div class="q-badge">Ahora</div>':qi.next?'<div class="q-badge" style="background:var(--muted)">Próximo año</div>':''}
+      <div class="q-lbl">${qi.q} · ${qi.m}</div>
+      <div class="q-title">${qi.avg>=80?'En buen camino':qi.avg>0?'En progreso':'Por comenzar'}</div>
+      <div class="q-bar"><div class="q-fill" style="width:${qi.avg}%;background:${qi.cur?'var(--blue)':'var(--dim)'}"></div></div>
+      <div class="q-meta">${qi.avg}% promedio</div>
+    </div>`).join('');
 }
 function toggleEdit(ai){const el=document.getElementById(`ae-${ai}`);el.classList.toggle('open');document.getElementById(`ac-${ai}`).classList.toggle('editing',el.classList.contains('open'));}
 function saveArea(ai){const a=S.areas[ai];a.name=document.getElementById(`ae-name-${ai}`).value.trim()||a.name;a.yearGoal=document.getElementById(`ae-goal-${ai}`).value.trim()||a.yearGoal;a.prog=parseInt(document.getElementById(`ae-prog-${ai}`).value)||0;a.icon=document.getElementById(`ae-ico-${ai}`).value.trim()||a.icon;toggleEdit(ai);renderPlans();}
