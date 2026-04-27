@@ -849,19 +849,26 @@ function restartOnboarding() {
   currentStep=1; showStep(1);
 }
 
-// ── Boot: redirect to app if already configured ──
+// ── Boot: login → onboarding → app ──
 (function boot() {
   try {
     const saved = localStorage.getItem('flow_config');
     if (saved) {
       const cfg = JSON.parse(saved);
+      // Already fully configured → go straight to app
       if (cfg && cfg.configured === true) {
         window.location.replace('app.html');
         return;
       }
+      // Has a userId (came from login) but not configured yet → show onboarding
+      if (cfg && cfg.userId) {
+        showStep(1);
+        return;
+      }
     }
   } catch(e) {}
-  showStep(1);
+  // No config at all → send to login first
+  window.location.replace('login.html');
 })();
 </script>
 </body>
