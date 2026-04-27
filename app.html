@@ -321,11 +321,24 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:.65rem
   <div class="sec">Áreas de vida</div>
   <div class="areas-grid" id="areas-grid"></div>
   <button class="pill-add" style="margin-bottom:1.5rem" onclick="addArea()">+ Nueva área</button>
+
   <div class="sec">Objetivos del año <strong id="yr-lbl" style="color:var(--blue);font-weight:500;text-transform:none;letter-spacing:0;font-size:11.5px"></strong></div>
   <div id="year-goals-list"></div>
   <button class="pill-add" style="margin-bottom:1.5rem" onclick="addYearGoal()">+ Agregar objetivo</button>
   <div class="sec">Trimestres</div>
   <div class="q-grid" id="q-grid"></div>
+
+  <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border)">
+    <div class="sec" style="margin-top:0">Zona de peligro</div>
+    <div style="background:var(--red-bg);border:1px solid #F5C4B3;border-radius:var(--r);padding:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
+      <div>
+        <div style="font-size:13px;font-weight:500;color:var(--red)">Reiniciar todo</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Borra toda tu configuración y tareas. Vuelve al onboarding.</div>
+      </div>
+      <button onclick="resetAll()" style="background:var(--red);color:#fff;border:none;padding:7px 14px;border-radius:var(--r-sm);font-family:var(--font);font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap">Reiniciar</button>
+    </div>
+  </div>
+
   <div class="spacer"></div>
 </div>
 
@@ -760,6 +773,13 @@ function saveArea(ai){const a=S.areas[ai];a.name=document.getElementById(`ae-nam
 function deleteArea(ai){if(!confirm(`¿Eliminar "${S.areas[ai].name}"?`))return;S.areas.splice(ai,1);renderPlans();}
 function addArea(){const name=prompt('Nombre del área:');if(!name)return;const goal=prompt('Meta del año:')||'Sin meta';const icons=['🎯','🧠','💡','🌱','🎨','🏆','🚀','❤️'];const cols=['#C27028','#1A8A5C','#8A1A5C','#5C1A8A','#1A5C8A'];const bgs=['#FEF0E0','#E0FEF0','#FEE0F0','#F0E0FE','#E0F0FE'];const ni=S.areas.length%icons.length,ci=S.areas.length%cols.length;S.areas.push({id:'area_'+Date.now(),name,icon:icons[ni],color:cols[ci],bg:bgs[ci],prog:0,yearGoal:goal,q:[0,0,0,0]});renderPlans();}
 function addYearGoal(){const ai=prompt(S.areas.map((a,i)=>`${i}: ${a.name}`).join('\n')+'\n\nNúmero del área:');const a=S.areas[parseInt(ai)];if(!a)return;const g=prompt(`Meta para ${a.name}:`);if(!g)return;a.yearGoal=g;renderPlans();}
+
+function resetAll(){
+  if(!confirm('¿Seguro que quieres reiniciar todo?\n\nSe borrarán todas tus tareas, áreas y configuración. Esta acción no se puede deshacer.'))return;
+  if(!confirm('Última confirmación — ¿borrar todo y empezar desde cero?'))return;
+  localStorage.removeItem('flow_config');
+  window.location.replace('index.html');
+}
 
 /* ═══ PERFORMANCE ═══ */
 function showPerf(el,view){document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('on'));el.classList.add('on');renderPerf(view);}
