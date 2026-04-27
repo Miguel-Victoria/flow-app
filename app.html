@@ -561,13 +561,7 @@ function openAddDay(wk,dI,h){
   setTimeout(()=>document.getElementById('add-day-name').focus(),80);
 }
 function closeAddDay(){document.getElementById('add-day-ov').classList.add('hidden');S.addDaySlot=null;}
-function confirmAddDay(){
-  const name=document.getElementById('add-day-name').value.trim();
-  if(!name||!S.addDaySlot)return;
-  const{wk,dI,h}=S.addDaySlot;
-  getSlot(wk,dI,h).push({name,cat:document.getElementById('add-day-cat').value,pri:document.getElementById('add-day-pri').value,pct:null});
-  closeAddDay();renderToday();
-}
+// confirmAddDay defined in persistence block below
 
 /* ═══ EDIT TASK ═══ */
 function openEditTask(wk,dI,h,idx,source){
@@ -578,32 +572,12 @@ function openEditTask(wk,dI,h,idx,source){
   const sel=document.getElementById('edit-task-cat');
   sel.innerHTML='<option value="">Sin categoría</option>'+S.areas.map(a=>`<option value="${a.id}">${a.icon} ${a.name}</option>`).join('');
   sel.value=t.cat||'';
-  const priSel=document.getElementById('edit-task-pri');
-  priSel.value=t.pri||'Media';
+  document.getElementById('edit-task-pri').value=t.pri||'Media';
   document.getElementById('edit-task-ov').classList.remove('hidden');
   setTimeout(()=>document.getElementById('edit-task-name').focus(),80);
 }
 function closeEditTask(){document.getElementById('edit-task-ov').classList.add('hidden');S.editTaskSlot=null;}
-function confirmEditTask(){
-  if(!S.editTaskSlot)return;
-  const{wk,dI,h,idx,source}=S.editTaskSlot;
-  const name=document.getElementById('edit-task-name').value.trim();
-  if(!name)return;
-  const t=getSlot(wk,dI,h)[idx];
-  t.name=name;
-  t.cat=document.getElementById('edit-task-cat').value;
-  t.pri=document.getElementById('edit-task-pri').value;
-  closeEditTask();
-  if(source==='week')renderWeek(); else renderToday();
-}
-function deleteEditTask(){
-  if(!S.editTaskSlot)return;
-  const{wk,dI,h,idx,source}=S.editTaskSlot;
-  if(!confirm('¿Eliminar esta tarea?'))return;
-  getSlot(wk,dI,h).splice(idx,1);
-  closeEditTask();
-  if(source==='week')renderWeek(); else renderToday();
-}
+// confirmEditTask and deleteEditTask defined in persistence block below
 
 /* ═══ WEEK NAVIGATION ═══ */
 function changeWeek(delta){S.viewWeekOffset+=delta;renderWeek();}
@@ -748,21 +722,33 @@ function renderPlans(){
         <div class="yg-bar"><div class="yg-fill" style="width:${a.prog}%;background:${a.color}"></div></div>
       </div>
     </div>`).join('');
-  const today2=new Date(), curQ2=Math.floor(today2.getMonth()/3), curYr=today2.getFullYear();
-  const nextYr=curYr+1;
+  const today2=new Date(), curMonth2=today2.getMonth(), curYr=today2.getFullYear(), nextYr=curYr+1;
+  const curQ2=Math.floor(curMonth2/3), monthInQ2=curMonth2%3;
+  const skipCurQ2 = monthInQ2===2;
+  const startQ2   = skipCurQ2 ? curQ2+1 : curQ2;
+  const qsLeft2   = 4 - startQ2;
   const allQ=[{q:'Q1',m:'Ene–Mar'},{q:'Q2',m:'Abr–Jun'},{q:'Q3',m:'Jul–Sep'},{q:'Q4',m:'Oct–Dic'}];
   let qItems=[];
-  for(let qi=curQ2;qi<4;qi++){
-    const qAvg=Math.round(S.areas.reduce((a,ar)=>a+(ar.q[qi]||0),0)/S.areas.length);
-    qItems.push({q:allQ[qi].q,m:allQ[qi].m+' '+curYr,avg:qAvg,cur:qi===curQ2});
-  }
-  if(4-curQ2<=2){
-    qItems.push({q:'Q1',m:`Ene–Mar ${nextYr}`,avg:0,cur:false,next:true});
-    if(4-curQ2<=1) qItems.push({q:'Q2',m:`Abr–Jun ${nextYr}`,avg:0,cur:false,next:true});
+  if(qsLeft2<=0){
+    qItems=[
+      {q:'Q1',m:`Ene–Mar ${nextYr}`,avg:0,cur:false,next:true},
+      {q:'Q2',m:`Abr–Jun ${nextYr}`,avg:0,cur:false,next:true},
+      {q:'Q3',m:`Jul–Sep ${nextYr}`,avg:0,cur:false,next:true},
+      {q:'Q4',m:`Oct–Dic ${nextYr}`,avg:0,cur:false,next:true},
+    ];
+  } else {
+    for(let qi=startQ2;qi<4;qi++){
+      const qAvg=Math.round(S.areas.reduce((a,ar)=>a+(ar.q[qi]||0),0)/Math.max(S.areas.length,1));
+      qItems.push({q:allQ[qi].q,m:allQ[qi].m,avg:qAvg,cur:qi===curQ2&&!skipCurQ2});
+    }
+    const needed=3-qItems.length;
+    for(let i=0;i<needed;i++){
+      qItems.push({q:allQ[i].q,m:`${allQ[i].m} ${nextYr}`,avg:0,cur:false,next:true});
+    }
   }
   document.getElementById('q-grid').innerHTML=qItems.map(qi=>`
     <div class="q-card${qi.cur?' cur':''}">
-      ${qi.cur?'<div class="q-badge">Ahora</div>':qi.next?'<div class="q-badge" style="background:var(--muted)">Próximo año</div>':''}
+      ${qi.cur?'<div class="q-badge">Ahora</div>':qi.next?`<div class="q-badge" style="background:var(--muted)">${nextYr}</div>`:''}
       <div class="q-lbl">${qi.q} · ${qi.m}</div>
       <div class="q-title">${qi.avg>=80?'En buen camino':qi.avg>0?'En progreso':'Por comenzar'}</div>
       <div class="q-bar"><div class="q-fill" style="width:${qi.avg}%;background:${qi.cur?'var(--blue)':'var(--dim)'}"></div></div>
@@ -809,13 +795,89 @@ function show(name){
   if(name==='perf') renderPerf('day');
 }
 
+/* ═══ PERSISTENCE ═══ */
+function saveState() {
+  try {
+    const saved = localStorage.getItem('flow_config');
+    const cfg   = saved ? JSON.parse(saved) : {};
+    cfg.tasks       = S.tasks;
+    cfg.areas       = S.areas;
+    cfg.configured  = true;
+    localStorage.setItem('flow_config', JSON.stringify(cfg));
+  } catch(e) { console.warn('Save error', e); }
+}
+
+// Auto-save after every mutation
+const _origConfirmCi = window.confirmCi;
+function confirmCi(){
+  if(S.selPct===null)return;
+  const{wk,dI,hour,idx}=S.activeCI;
+  getSlot(wk,dI,hour)[idx].pct=S.selPct;
+  closeCi(); renderToday(); saveState();
+}
+function confirmAddDay(){
+  const name=document.getElementById('add-day-name').value.trim();
+  if(!name||!S.addDaySlot)return;
+  const{wk,dI,h}=S.addDaySlot;
+  getSlot(wk,dI,h).push({name,cat:document.getElementById('add-day-cat').value,pri:document.getElementById('add-day-pri').value,pct:null});
+  closeAddDay(); renderToday(); saveState();
+}
+function saveTask(){
+  const name=document.getElementById('add-name').value.trim();
+  if(!name||!S.addSlot)return;
+  const{wk,dIdx,hour}=S.addSlot;
+  getSlot(wk,dIdx,hour).push({name,cat:document.getElementById('add-cat').value,dur:document.getElementById('add-dur').value,pri:document.getElementById('add-pri').value,pct:null});
+  closePanel(); renderWeek(); saveState();
+}
+function confirmEditTask(){
+  if(!S.editTaskSlot)return;
+  const{wk,dI,h,idx,source}=S.editTaskSlot;
+  const name=document.getElementById('edit-task-name').value.trim();
+  if(!name)return;
+  const t=getSlot(wk,dI,h)[idx];
+  t.name=name; t.cat=document.getElementById('edit-task-cat').value; t.pri=document.getElementById('edit-task-pri').value;
+  closeEditTask();
+  if(source==='week')renderWeek(); else renderToday();
+  saveState();
+}
+function deleteEditTask(){
+  if(!S.editTaskSlot)return;
+  const{wk,dI,h,idx,source}=S.editTaskSlot;
+  if(!confirm('¿Eliminar esta tarea?'))return;
+  getSlot(wk,dI,h).splice(idx,1);
+  closeEditTask();
+  if(source==='week')renderWeek(); else renderToday();
+  saveState();
+}
+
 /* ═══ LOAD CONFIG ═══ */
 (function init(){
   const saved=localStorage.getItem('flow_config');
-  if(saved){try{const cfg=JSON.parse(saved);if(cfg.areas&&cfg.areas.length)S.areas=cfg.areas;if(cfg.weekSchedule&&cfg.weekSchedule.length){const wk=weekKey(new Date());cfg.weekSchedule.forEach(slot=>{slot.tasks.forEach(task=>{const days=task.days||[0,1,2,3,4];days.forEach(dI=>{getSlot(wk,dI,slot.hour).push({name:task.name,cat:task.cat,pri:task.pri||'Media',pct:null});});});});}if(cfg.quarterGoals){S.quarters=cfg.quarterGoals.map((q,i)=>({q:q.q,m:q.m,goal:q.focus,prog:i===0?100:i===1?55:0,cur:i===1}));}return;}catch(e){}}
-  // Demo fallback
+  if(saved){
+    try{
+      const cfg=JSON.parse(saved);
+      // Restore areas
+      if(cfg.areas&&cfg.areas.length) S.areas=cfg.areas;
+      // Restore tasks (actual recorded data)
+      if(cfg.tasks) S.tasks=cfg.tasks;
+      // If tasks are empty but we have a weekSchedule template, seed current week
+      if(!Object.keys(S.tasks).length && cfg.weekSchedule && cfg.weekSchedule.length){
+        const wk=weekKey(new Date());
+        cfg.weekSchedule.forEach(slot=>{
+          slot.tasks.forEach(task=>{
+            const days=task.days||[0,1,2,3,4];
+            days.forEach(dI=>{ getSlot(wk,dI,slot.hour).push({name:task.name,cat:task.cat,pri:task.pri||'Media',pct:null}); });
+          });
+        });
+        // Save the seeded tasks back
+        cfg.tasks=S.tasks; localStorage.setItem('flow_config',JSON.stringify(cfg));
+      }
+      return;
+    } catch(e){ console.warn('Load error',e); }
+  }
+  // Demo fallback — no onboarding done
   const wk=weekKey(new Date()), dI=dayIdx(new Date());
-  [[7,[{name:'Meditación',cat:'personal',pri:'Alta',pct:100}]],[8,[{name:'Ejercicio',cat:'salud',pri:'Alta',pct:75}]],[9,[{name:'Email & prioridades',cat:'trabajo',pri:'Media',pct:100}]],[10,[{name:'Proyecto principal',cat:'trabajo',pri:'Alta',pct:50},{name:'Revisión métricas',cat:'trabajo',pri:'Media',pct:null}]],[11,[{name:'Estudio',cat:'aprend',pri:'Alta',pct:null}]],[12,[{name:'Almuerzo',cat:'personal',pri:'Baja',pct:null}]],[13,[{name:'Reuniones',cat:'trabajo',pri:'Alta',pct:null}]],[14,[{name:'Revisión finanzas',cat:'finanzas',pri:'Media',pct:null}]],[15,[{name:'Trabajo creativo',cat:'aprend',pri:'Media',pct:null}]],[17,[{name:'Lectura',cat:'aprend',pri:'Media',pct:null}]],[18,[{name:'Familia',cat:'relac',pri:'Alta',pct:null}]]].forEach(([h,tasks])=>tasks.forEach(t=>getSlot(wk,dI,h).push({...t})));
+  [[7,[{name:'Meditación',cat:'personal',pri:'Alta',pct:100}]],[8,[{name:'Ejercicio',cat:'salud',pri:'Alta',pct:75}]],[9,[{name:'Email',cat:'trabajo',pri:'Media',pct:100}]],[10,[{name:'Proyecto principal',cat:'trabajo',pri:'Alta',pct:50},{name:'Métricas',cat:'trabajo',pri:'Media',pct:null}]],[11,[{name:'Estudio',cat:'aprend',pri:'Alta',pct:null}]],[12,[{name:'Almuerzo',cat:'personal',pri:'Baja',pct:null}]],[13,[{name:'Reuniones',cat:'trabajo',pri:'Alta',pct:null}]],[14,[{name:'Finanzas',cat:'finanzas',pri:'Media',pct:null}]],[15,[{name:'Trabajo creativo',cat:'aprend',pri:'Media',pct:null}]],[17,[{name:'Lectura',cat:'aprend',pri:'Media',pct:null}]],[18,[{name:'Familia',cat:'relac',pri:'Alta',pct:null}]]].forEach(([h,tasks])=>tasks.forEach(t=>getSlot(wk,dI,h).push({...t})));
 })();
 
 renderToday();

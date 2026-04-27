@@ -689,67 +689,58 @@ async function callClaude() {
     .sort(([a],[b]) => parseInt(a)-parseInt(b))
     .map(([hour, tasks]) => ({ hour: parseInt(hour), tasks }));
 
-  // ── Quarter goals — only from current quarter forward ──
-  const today = new Date();
-  const curQ  = Math.floor(today.getMonth() / 3);  // 0=Q1 1=Q2 2=Q3 3=Q4
-  const curYear = today.getFullYear();
-  const nextYear = curYear + 1;
+  // ── Quarter goals — smart logic based on today ──
+  const today      = new Date();
+  const curMonth   = today.getMonth();   // 0-11
+  const curYear    = today.getFullYear();
+  const nextYear   = curYear + 1;
+  const curQ       = Math.floor(curMonth / 3);  // 0=Q1 … 3=Q4
+  const monthInQ   = curMonth % 3;              // 0,1,2 = which month within quarter
+  // Skip current quarter if we're in its last month (only ~1 month left = not worth planning)
+  const skipCurQ   = monthInQ === 2;
+  const startQ     = skipCurQ ? curQ + 1 : curQ;
+  const qsLeft     = 4 - startQ;  // quarters left this year from startQ
 
-  // How many quarters remain this year (including current)?
-  const remainingQs = 4 - curQ;  // e.g. if curQ=2 (Q3) → 2 remain
-
-  const ALL_Q = [
-    { q:'Q1', m:'Ene–Mar', yr: curYear },
-    { q:'Q2', m:'Abr–Jun', yr: curYear },
-    { q:'Q3', m:'Jul–Sep', yr: curYear },
-    { q:'Q4', m:'Oct–Dic', yr: curYear },
+  const Q_DATA = [
+    {q:'Q1', m:'Ene–Mar'}, {q:'Q2', m:'Abr–Jun'},
+    {q:'Q3', m:'Jul–Sep'}, {q:'Q4', m:'Oct–Dic'}
   ];
-  const NEXT_Q = [
-    { q:'Q1', m:'Ene–Mar', yr: nextYear },
-    { q:'Q2', m:'Abr–Jun', yr: nextYear },
-    { q:'Q3', m:'Jul–Sep', yr: nextYear },
-    { q:'Q4', m:'Oct–Dic', yr: nextYear },
+  const shortG = (g='', max=38) => g.length > max ? g.slice(0, max-1)+'…' : g;
+  const aG = (i) => shortG(areas[i % areas.length]?.yearGoal || '');
+  const FOCUS = [
+    () => `Arrancar fuerte — ${aG(0)}`,
+    () => `Construir momentum — ${aG(1)}`,
+    () => `Consolidar logros — ${aG(2)}`,
+    () => `Cerrar el año — ${aG(3)}`,
   ];
-
-  // Build focus phrases using area goals
-  const areaGoalFor = (idx) => areas[idx % areas.length]?.yearGoal || '';
-  const shortGoal   = (g)   => g.length > 40 ? g.slice(0, 38) + '…' : g;
 
   let quarterGoals = [];
 
-  if (remainingQs <= 1) {
-    // Near end of year (Q4 or Dec) → add current Q + all next year
-    if (remainingQs === 1) {
-      quarterGoals.push({ q: ALL_Q[curQ].q, m: ALL_Q[curQ].m + ' ' + curYear,
-        focus: `Cerrar ${curYear} fuerte — ${shortGoal(areaGoalFor(0))}` });
-    }
-    quarterGoals.push(
-      { q:'Q1', m:`Ene–Mar ${nextYear}`, focus: `Arrancar con fuerza — ${shortGoal(areaGoalFor(0))}` },
-      { q:'Q2', m:`Abr–Jun ${nextYear}`, focus: `Construir momentum — ${shortGoal(areaGoalFor(1))}` },
-      { q:'Q3', m:`Jul–Sep ${nextYear}`, focus: `Consolidar logros — ${shortGoal(areaGoalFor(2))}` },
-      { q:'Q4', m:`Oct–Dic ${nextYear}`, focus: `Cierre y planificación ${nextYear + 1}` },
-    );
+  if (qsLeft <= 0) {
+    // Nothing left this year (Dec or last month of Q4) → full next year plan
+    quarterGoals = [
+      {q:'Q1', m:`Ene–Mar ${nextYear}`, focus:`Arrancar ${nextYear} — ${aG(0)}`},
+      {q:'Q2', m:`Abr–Jun ${nextYear}`, focus:`Construir momentum — ${aG(1)}`},
+      {q:'Q3', m:`Jul–Sep ${nextYear}`, focus:`Consolidar logros — ${aG(2)}`},
+      {q:'Q4', m:`Oct–Dic ${nextYear}`, focus:`Cierre y plan ${nextYear+1}`},
+    ];
   } else {
-    // Still quarters left this year — show only from curQ onward
-    for (let qi = curQ; qi < 4; qi++) {
-      const qData = ALL_Q[qi];
-      const focuses = [
-        `Arrancar fuerte — ${shortGoal(areaGoalFor(0))}`,
-        `Construir momentum — ${shortGoal(areaGoalFor(1))}`,
-        `Consolidar logros — ${shortGoal(areaGoalFor(2))}`,
-        `Cierre del año — ${shortGoal(areaGoalFor(3))}`,
-      ];
-      quarterGoals.push({ q: qData.q, m: qData.m, focus: focuses[qi] });
+    // Add remaining quarters of this year
+    for (let qi = startQ; qi < 4; qi++) {
+      quarterGoals.push({ q: Q_DATA[qi].q, m: Q_DATA[qi].m, focus: FOCUS[qi]() });
     }
-    // If only showing 1 or 2 quarters, pad with next year's Q1
-    if (remainingQs <= 2) {
-      quarterGoals.push({ q:'Q1', m:`Ene–Mar ${nextYear}`,
-        focus: `Nuevo año — ${shortGoal(areaGoalFor(0))}` });
+    // Always show at least 3 items total — pad with next year
+    const needed = 3 - quarterGoals.length;
+    for (let i = 0; i < needed; i++) {
+      quarterGoals.push({
+        q: Q_DATA[i].q, m: `${Q_DATA[i].m} ${nextYear}`,
+        focus: i === 0 ? `Arrancar ${nextYear} — ${aG(0)}` : FOCUS[i]()
+      });
     }
   }
 
   // ── Welcome message ──
-  const roleMsg = OB.role ? `Como ${OB.role.toLowerCase()}, ` : '';
+  const roleMsg  = OB.role ? `Como ${OB.role.toLowerCase()}, ` : '';
   const areaCount = areas.length;
   const welcomeMsg = `${roleMsg}tu sistema está diseñado para ayudarte a crecer en ${areaCount} área${areaCount>1?'s':''} clave de tu vida. Cada día que registres tu avance estarás un paso más cerca de la versión de ti que quieres ser.`;
 
@@ -858,7 +849,20 @@ function restartOnboarding() {
   currentStep=1; showStep(1);
 }
 
-showStep(1);
+// ── Boot: redirect to app if already configured ──
+(function boot() {
+  try {
+    const saved = localStorage.getItem('flow_config');
+    if (saved) {
+      const cfg = JSON.parse(saved);
+      if (cfg && cfg.configured === true) {
+        window.location.replace('app.html');
+        return;
+      }
+    }
+  } catch(e) {}
+  showStep(1);
+})();
 </script>
 </body>
 </html>
