@@ -822,6 +822,38 @@ function show(name){
   if(name==='perf') renderPerf('day');
 }
 
+/* ═══ SUPABASE SYNC ═══ */
+const SB_URL = 'https://gedfmktwiotsubqcfanp.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZGZta3R3aW90c3VicWNmYW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNDI5NjgsImV4cCI6MjA5MjgxODk2OH0.ZkYd1YVXPUQ_pV__oSK_floiNtSU_1TXiy0Fy-SCr5Q';
+let sbClient = null;
+let syncTimeout = null;
+
+async function initSupabase() {
+  try {
+    if (!window.supabase) return;
+    sbClient = window.supabase.createClient(SB_URL, SB_KEY);
+  } catch(e) { console.warn('Supabase init error', e); }
+}
+
+// Debounced cloud save — waits 2s after last change before saving to avoid hammering
+function scheduleSyncToCloud() {
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(syncToCloud, 2000);
+}
+
+async function syncToCloud() {
+  if (!sbClient) return;
+  try {
+    const cfg = JSON.parse(localStorage.getItem('flow_config') || '{}');
+    if (!cfg.userId || cfg.userId === 'local') return;
+    await sbClient.from('user_configs').upsert({
+      id: cfg.userId,
+      config: cfg,
+      updated_at: new Date().toISOString()
+    });
+  } catch(e) { console.warn('Cloud sync error', e); }
+}
+
 /* ═══ PERSISTENCE ═══ */
 function saveState() {
   try {
@@ -832,10 +864,10 @@ function saveState() {
     cfg.weekSchedule = S.weekSchedule || cfg.weekSchedule;
     cfg.configured   = true;
     localStorage.setItem('flow_config', JSON.stringify(cfg));
+    scheduleSyncToCloud();
   } catch(e) { console.warn('Save error', e); }
 }
 
-// Auto-save after every mutation
 const _origConfirmCi = window.confirmCi;
 function confirmCi(){
   if(S.selPct===null)return;
@@ -879,29 +911,58 @@ function deleteEditTask(){
 }
 
 /* ═══ LOAD CONFIG ═══ */
-(function init(){
+(async function init(){
+  // Load Supabase SDK and init client
+  await new Promise(r=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    s.onload=r; s.onerror=r;
+    document.head.appendChild(s);
+  });
+  await initSupabase();
+
   const saved=localStorage.getItem('flow_config');
   if(saved){
     try{
       const cfg=JSON.parse(saved);
+
+      // If user has a real account, try to fetch latest from cloud first
+      if(cfg.userId && cfg.userId !== 'local' && sbClient){
+        try{
+          const{data}=await sbClient.from('user_configs').select('config').eq('id',cfg.userId).single();
+          if(data?.config){
+            // Use cloud version (most up to date across devices)
+            const cloudCfg = data.config;
+            localStorage.setItem('flow_config', JSON.stringify(cloudCfg));
+            if(cloudCfg.areas&&cloudCfg.areas.length) S.areas=cloudCfg.areas;
+            if(cloudCfg.tasks) S.tasks=cloudCfg.tasks;
+            if(cloudCfg.weekSchedule) S.weekSchedule=cloudCfg.weekSchedule;
+            seedWeekIfEmpty(weekKey(new Date()));
+            renderToday();
+            return;
+          }
+        }catch(e){ console.warn('Cloud load error, using local', e); }
+      }
+
+      // Fallback to local
       if(cfg.areas&&cfg.areas.length) S.areas=cfg.areas;
       if(cfg.tasks) S.tasks=cfg.tasks;
-      // Store the template for auto-seeding future weeks
       if(cfg.weekSchedule) S.weekSchedule=cfg.weekSchedule;
-      // Seed current week if empty
       seedWeekIfEmpty(weekKey(new Date()));
+      renderToday();
       return;
     } catch(e){ console.warn('Load error',e); }
   }
-  // Demo fallback
+
+  // Demo fallback — no config at all
   const wk=weekKey(new Date()), dI=dayIdx(new Date());
   [[7,[{name:'Meditación',cat:'personal',pri:'Alta',pct:100}]],[8,[{name:'Ejercicio',cat:'salud',pri:'Alta',pct:75}]],[9,[{name:'Email',cat:'trabajo',pri:'Media',pct:100}]],[10,[{name:'Proyecto principal',cat:'trabajo',pri:'Alta',pct:50},{name:'Métricas',cat:'trabajo',pri:'Media',pct:null}]],[11,[{name:'Estudio',cat:'aprend',pri:'Alta',pct:null}]],[12,[{name:'Almuerzo',cat:'personal',pri:'Baja',pct:null}]],[13,[{name:'Reuniones',cat:'trabajo',pri:'Alta',pct:null}]],[14,[{name:'Finanzas',cat:'finanzas',pri:'Media',pct:null}]],[15,[{name:'Trabajo creativo',cat:'aprend',pri:'Media',pct:null}]],[17,[{name:'Lectura',cat:'aprend',pri:'Media',pct:null}]],[18,[{name:'Familia',cat:'relac',pri:'Alta',pct:null}]]].forEach(([h,tasks])=>tasks.forEach(t=>getSlot(wk,dI,h).push({...t})));
+  renderToday();
 })();
 
 /* Auto-seed a week from the template if it has no tasks yet */
 function seedWeekIfEmpty(wk){
   if(!S.weekSchedule||!S.weekSchedule.length)return;
-  // Check if this week already has any tasks
   const hasAny=S.tasks[wk]&&Object.values(S.tasks[wk]).some(d=>Object.values(d).some(h=>h.length>0));
   if(hasAny)return;
   S.weekSchedule.forEach(slot=>{
@@ -914,8 +975,6 @@ function seedWeekIfEmpty(wk){
   });
   saveState();
 }
-
-renderToday();
 </script>
 </body>
 </html>
