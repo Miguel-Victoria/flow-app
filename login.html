@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Mi Norte — Acceder</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --blue:#2F80C7;--blue-lt:#EAF3FB;--blue-md:#B8D8F5;--blue-dk:#1A5490;--blue-xdk:#0C447C;
+  --bg:#F5F8FC;--white:#FFFFFF;--border:#DDEAF6;
+  --text:#0F1F30;--muted:#6B8BAA;--dim:#C5D9EC;
+  --red:#992B1A;--red-bg:#FEF0EE;
+  --green:#2E6B1A;--green-bg:#EDF6E8;
+  --r:10px;--r-sm:7px;--r-lg:20px;
+  --font:'DM Sans',system-ui,sans-serif;
+  --font-d:'Instrument Serif',Georgia,serif;
+}
+html,body{height:100%;width:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+
+/* BG decoration */
+body::before{content:'';position:fixed;top:-120px;right:-120px;width:400px;height:400px;background:radial-gradient(circle,rgba(47,128,199,.07) 0%,transparent 70%);pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;bottom:-80px;left:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(47,128,199,.05) 0%,transparent 70%);pointer-events:none;z-index:0}
+
+main{flex:1;display:flex;align-items:center;justify-content:center;padding:1.5rem 1rem;position:relative;z-index:1}
+
+/* CARD */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:2.25rem 2rem;width:min(400px,100%);box-shadow:0 4px 32px rgba(15,31,48,.06)}
+
+/* LOGO AREA */
+.logo-area{text-align:center;margin-bottom:2rem}
+.logo-icon{display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;width:56px;height:56px;background:var(--blue-dk);border-radius:14px}
+.logo-name{font-family:var(--font-d);font-size:1.5rem;color:var(--text);font-style:italic;letter-spacing:-.01em}
+.logo-name em{font-style:normal;color:var(--blue);font-weight:300}
+.logo-tagline{font-size:12.5px;color:var(--muted);margin-top:.3rem}
+
+/* TABS */
+.tabs{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:3px;margin-bottom:1.5rem}
+.tab{flex:1;padding:7px;border-radius:6px;border:none;background:transparent;font-family:var(--font);font-size:13px;cursor:pointer;color:var(--muted);transition:all .15s;font-weight:400}
+.tab.on{background:var(--white);color:var(--blue-dk);font-weight:500;box-shadow:0 1px 4px rgba(47,128,199,.12)}
+
+/* FORM */
+.form-group{margin-bottom:1rem}
+.form-label{display:block;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem}
+.form-input{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:.7rem .9rem;font-size:14px;font-family:var(--font);color:var(--text);outline:none;transition:border-color .15s;-webkit-appearance:none}
+.form-input:focus{border-color:var(--blue);background:var(--white)}
+.form-input::placeholder{color:var(--dim)}
+
+/* BUTTON */
+.btn{width:100%;border:none;border-radius:var(--r-sm);padding:.85rem;font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-primary{background:var(--blue);color:#fff;margin-top:.25rem}
+.btn-primary:hover{background:var(--blue-dk)}
+.btn-primary:disabled{background:var(--dim);cursor:default}
+.btn-google{background:var(--white);color:var(--text);border:1.5px solid var(--border);margin-bottom:.25rem}
+.btn-google:hover{border-color:var(--blue-md);background:var(--blue-lt)}
+
+/* DIVIDER */
+.divider{display:flex;align-items:center;gap:.75rem;margin:.75rem 0;color:var(--muted);font-size:12px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* FORGOT */
+.forgot{text-align:right;margin-top:.3rem}
+.forgot-link{font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:var(--font);padding:0}
+.forgot-link:hover{color:var(--blue)}
+
+/* MESSAGES */
+.msg{border-radius:var(--r-sm);padding:.7rem 1rem;font-size:13px;margin-bottom:1rem;display:none;line-height:1.5}
+.msg.on{display:block}
+.msg.err{background:var(--red-bg);color:var(--red);border:1px solid #F5C4B3}
+.msg.ok{background:var(--green-bg);color:var(--green);border:1px solid #B8D8A0}
+
+/* SPINNER */
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* FOOTER */
+.card-footer{text-align:center;margin-top:1.25rem;font-size:12px;color:var(--muted)}
+.card-footer a{color:var(--blue);text-decoration:none;cursor:pointer}
+.card-footer a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+
+    <!-- LOGO -->
+    <div class="logo-area">
+      <div class="logo-icon">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <polyline points="4,24 12,14 19,19 28,6" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <polyline points="23,6 28,6 28,11" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="logo-name">Mi Norte<em>.</em></div>
+      <div class="logo-tagline">Tu sistema de productividad personal</div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab on" id="tab-login" onclick="switchTab('login')">Entrar</button>
+      <button class="tab" id="tab-signup" onclick="switchTab('signup')">Crear cuenta</button>
+    </div>
+
+    <!-- MESSAGES -->
+    <div class="msg" id="msg"></div>
+
+    <!-- LOGIN FORM -->
+    <div id="login-form">
+      <button class="btn btn-google" onclick="signInGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        Continuar con Google
+      </button>
+
+      <div class="divider">o con email</div>
+
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="login-email" type="email" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contraseña</label>
+        <input class="form-input" id="login-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        <div class="forgot"><button class="forgot-link" onclick="doReset()">¿Olvidaste tu contraseña?</button></div>
+      </div>
+      <button class="btn btn-primary" id="login-btn" onclick="doLogin()">Entrar</button>
+    </div>
+
+    <!-- SIGNUP FORM -->
+    <div id="signup-form" style="display:none">
+      <button class="btn btn-google" onclick="signInGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        Registrarse con Google
+      </button>
+
+      <div class="divider">o con email</div>
+
+      <div class="form-group">
+        <label class="form-label">Nombre</label>
+        <input class="form-input" id="signup-name" type="text" placeholder="¿Cómo te llamas?">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="signup-email" type="email" placeholder="tu@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contraseña</label>
+        <input class="form-input" id="signup-pass" type="password" placeholder="Mínimo 8 caracteres" onkeydown="if(event.key==='Enter')doSignup()">
+      </div>
+      <button class="btn btn-primary" id="signup-btn" onclick="doSignup()">Crear cuenta</button>
+    </div>
+
+    <div class="card-footer">
+      Protegido con cifrado de extremo a extremo ·
+      <a onclick="skipLogin()">Usar sin cuenta</a>
+    </div>
+
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL = 'TU_URL_AQUI';
+const SUPABASE_KEY = 'TU_ANON_KEY_AQUI';
+const IS_CONFIGURED = !SUPABASE_URL.includes('TU_');
+let sb = null;
+
+async function boot() {
+  if (!IS_CONFIGURED) return;
+  await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js');
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const { data:{ session } } = await sb.auth.getSession();
+  if (session) { await loadCloud(session.user); redirect(); }
+}
+
+function loadScript(src){return new Promise((r,j)=>{const s=document.createElement('script');s.src=src;s.onload=r;s.onerror=j;document.head.appendChild(s);})}
+function skipLogin(){window.location.href='index.html';}
+function redirect(){const c=JSON.parse(localStorage.getItem('flow_config')||'{}');window.location.replace(c.configured?'app.html':'index.html');}
+
+function switchTab(t){
+  document.getElementById('tab-login').classList.toggle('on', t==='login');
+  document.getElementById('tab-signup').classList.toggle('on', t==='signup');
+  document.getElementById('login-form').style.display  = t==='login' ?'block':'none';
+  document.getElementById('signup-form').style.display = t==='signup'?'block':'none';
+  clearMsg();
+}
+
+function showMsg(text,type='err'){const el=document.getElementById('msg');el.textContent=text;el.className=`msg ${type} on`;}
+function clearMsg(){document.getElementById('msg').className='msg';}
+
+function setBusy(id,busy,label){
+  const b=document.getElementById(id);
+  b.disabled=busy;
+  b.innerHTML=busy?'<div class="spinner"></div>':label;
+}
+
+async function doLogin(){
+  if(!sb){return skipLogin();}
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  if(!email||!pass){showMsg('Completa todos los campos');return;}
+  setBusy('login-btn',true,'Entrar'); clearMsg();
+  try{
+    const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error){showMsg(xlate(error.message));return;}
+    await loadCloud(data.user); redirect();
+  }catch{showMsg('Error de conexión. Intenta de nuevo.');}
+  finally{setBusy('login-btn',false,'Entrar');}
+}
+
+async function doSignup(){
+  if(!sb){return skipLogin();}
+  const name=document.getElementById('signup-name').value.trim();
+  const email=document.getElementById('signup-email').value.trim();
+  const pass=document.getElementById('signup-pass').value;
+  if(!name||!email||!pass){showMsg('Completa todos los campos');return;}
+  if(pass.length<8){showMsg('La contraseña debe tener al menos 8 caracteres');return;}
+  setBusy('signup-btn',true,'Crear cuenta'); clearMsg();
+  try{
+    const{data,error}=await sb.auth.signUp({email,password:pass,options:{data:{name}}});
+    if(error){showMsg(xlate(error.message));return;}
+    if(data.user&&!data.session) showMsg('✉️ Revisa tu email para confirmar tu cuenta','ok');
+    else if(data.session) redirect();
+  }catch{showMsg('Error de conexión. Intenta de nuevo.');}
+  finally{setBusy('signup-btn',false,'Crear cuenta');}
+}
+
+async function signInGoogle(){
+  if(!sb){return skipLogin();}
+  await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+'/app.html'}});
+}
+
+async function doReset(){
+  if(!sb){return;}
+  const email=document.getElementById('login-email').value.trim();
+  if(!email){showMsg('Escribe tu email primero');return;}
+  const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+'/login.html'});
+  if(error) showMsg(xlate(error.message));
+  else showMsg('✉️ Te enviamos un link para restablecer tu contraseña','ok');
+}
+
+async function loadCloud(user){
+  if(!sb)return;
+  try{
+    const{data}=await sb.from('user_configs').select('config').eq('id',user.id).single();
+    if(data?.config) localStorage.setItem('flow_config',JSON.stringify({...data.config,userId:user.id}));
+    else localStorage.setItem('flow_config',JSON.stringify({userId:user.id,configured:false}));
+  }catch(e){console.warn(e);}
+}
+
+function xlate(m){
+  if(m.includes('Invalid login'))return 'Email o contraseña incorrectos';
+  if(m.includes('Email not confirmed'))return 'Confirma tu email antes de entrar';
+  if(m.includes('already registered'))return 'Ya existe una cuenta con este email';
+  if(m.includes('Password'))return 'La contraseña debe tener al menos 8 caracteres';
+  if(m.includes('rate limit'))return 'Demasiados intentos. Espera unos minutos';
+  return 'Ocurrió un error. Intenta de nuevo';
+}
+
+boot();
+</script>
+</body>
+</html>

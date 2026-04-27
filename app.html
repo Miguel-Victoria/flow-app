@@ -454,6 +454,7 @@ const S = {
     {id:'personal', name:'Personal',        icon:'🌱', color:'#5C8A0A', bg:'#F3FBEA', prog:40, yearGoal:'Hábitos de bienestar diarios', q:[70,45,0,0]},
   ],
   selPct:null, activeCI:null, addSlot:null, addDaySlot:null, editTaskSlot:null, perfChart:null,
+  weekSchedule: null,  // template from onboarding, used to seed future weeks
   viewDate: new Date(),  // which day is shown in Today view
   viewWeekOffset: 0,     // week offset for week view (0 = current week)
   mockW:[72,85,60,90,55,78,82],
@@ -593,7 +594,13 @@ function closeEditTask(){document.getElementById('edit-task-ov').classList.add('
 // confirmEditTask and deleteEditTask defined in persistence block below
 
 /* ═══ WEEK NAVIGATION ═══ */
-function changeWeek(delta){S.viewWeekOffset+=delta;renderWeek();}
+function changeWeek(delta){
+  S.viewWeekOffset+=delta;
+  // Auto-seed the week we're navigating to
+  const base=new Date();base.setDate(base.getDate()+S.viewWeekOffset*7);
+  seedWeekIfEmpty(weekKey(base));
+  renderWeek();
+}
 
 /* ═══ WEEK GRID ═══ */
 function renderWeek(){
@@ -820,9 +827,10 @@ function saveState() {
   try {
     const saved = localStorage.getItem('flow_config');
     const cfg   = saved ? JSON.parse(saved) : {};
-    cfg.tasks       = S.tasks;
-    cfg.areas       = S.areas;
-    cfg.configured  = true;
+    cfg.tasks        = S.tasks;
+    cfg.areas        = S.areas;
+    cfg.weekSchedule = S.weekSchedule || cfg.weekSchedule;
+    cfg.configured   = true;
     localStorage.setItem('flow_config', JSON.stringify(cfg));
   } catch(e) { console.warn('Save error', e); }
 }
@@ -876,29 +884,36 @@ function deleteEditTask(){
   if(saved){
     try{
       const cfg=JSON.parse(saved);
-      // Restore areas
       if(cfg.areas&&cfg.areas.length) S.areas=cfg.areas;
-      // Restore tasks (actual recorded data)
       if(cfg.tasks) S.tasks=cfg.tasks;
-      // If tasks are empty but we have a weekSchedule template, seed current week
-      if(!Object.keys(S.tasks).length && cfg.weekSchedule && cfg.weekSchedule.length){
-        const wk=weekKey(new Date());
-        cfg.weekSchedule.forEach(slot=>{
-          slot.tasks.forEach(task=>{
-            const days=task.days||[0,1,2,3,4];
-            days.forEach(dI=>{ getSlot(wk,dI,slot.hour).push({name:task.name,cat:task.cat,pri:task.pri||'Media',pct:null}); });
-          });
-        });
-        // Save the seeded tasks back
-        cfg.tasks=S.tasks; localStorage.setItem('flow_config',JSON.stringify(cfg));
-      }
+      // Store the template for auto-seeding future weeks
+      if(cfg.weekSchedule) S.weekSchedule=cfg.weekSchedule;
+      // Seed current week if empty
+      seedWeekIfEmpty(weekKey(new Date()));
       return;
     } catch(e){ console.warn('Load error',e); }
   }
-  // Demo fallback — no onboarding done
+  // Demo fallback
   const wk=weekKey(new Date()), dI=dayIdx(new Date());
   [[7,[{name:'Meditación',cat:'personal',pri:'Alta',pct:100}]],[8,[{name:'Ejercicio',cat:'salud',pri:'Alta',pct:75}]],[9,[{name:'Email',cat:'trabajo',pri:'Media',pct:100}]],[10,[{name:'Proyecto principal',cat:'trabajo',pri:'Alta',pct:50},{name:'Métricas',cat:'trabajo',pri:'Media',pct:null}]],[11,[{name:'Estudio',cat:'aprend',pri:'Alta',pct:null}]],[12,[{name:'Almuerzo',cat:'personal',pri:'Baja',pct:null}]],[13,[{name:'Reuniones',cat:'trabajo',pri:'Alta',pct:null}]],[14,[{name:'Finanzas',cat:'finanzas',pri:'Media',pct:null}]],[15,[{name:'Trabajo creativo',cat:'aprend',pri:'Media',pct:null}]],[17,[{name:'Lectura',cat:'aprend',pri:'Media',pct:null}]],[18,[{name:'Familia',cat:'relac',pri:'Alta',pct:null}]]].forEach(([h,tasks])=>tasks.forEach(t=>getSlot(wk,dI,h).push({...t})));
 })();
+
+/* Auto-seed a week from the template if it has no tasks yet */
+function seedWeekIfEmpty(wk){
+  if(!S.weekSchedule||!S.weekSchedule.length)return;
+  // Check if this week already has any tasks
+  const hasAny=S.tasks[wk]&&Object.values(S.tasks[wk]).some(d=>Object.values(d).some(h=>h.length>0));
+  if(hasAny)return;
+  S.weekSchedule.forEach(slot=>{
+    slot.tasks.forEach(task=>{
+      const days=task.days||(task.pri==='Baja'?[0,1,2,3,4,5,6]:[0,1,2,3,4]);
+      days.forEach(dI=>{
+        getSlot(wk,dI,slot.hour).push({name:task.name,cat:task.cat,pri:task.pri||'Media',pct:null});
+      });
+    });
+  });
+  saveState();
+}
 
 renderToday();
 </script>
