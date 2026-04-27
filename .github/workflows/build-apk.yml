@@ -1,0 +1,80 @@
+name: Build Mi Norte APK
+ 
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+ 
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+ 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+ 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+ 
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+ 
+      - name: Initialize PWA project
+        run: |
+          bubblewrap init --manifest https://miguel-victoria.github.io/flow-app/manifest.json \
+            --directory ./twa-project \
+            --packageId io.github.miguel_victoria.twa \
+            --name "Mi Norte" \
+            --shortName "Mi Norte" \
+            --startUrl /flow-app/login.html \
+            --themeColor "#2F80C7" \
+            --backgroundColor "#F5F8FC" \
+            --icon https://miguel-victoria.github.io/flow-app/icon-512.png \
+            --maskableIcon https://miguel-victoria.github.io/flow-app/icon-512.png
+ 
+      - name: Create keystore
+        run: |
+          keytool -genkey -v \
+            -keystore ./twa-project/android.keystore \
+            -alias minorte \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass MiNorte2025 \
+            -keypass MiNorte2025 \
+            -dname "CN=Miguel Victoria, OU=MAVS, O=Mi Norte, L=Bogota, S=Cundinamarca, C=CO"
+ 
+      - name: Build APK
+        working-directory: ./twa-project
+        run: |
+          export JAVA_OPTS="-Xmx1024m"
+          bubblewrap build \
+            --keystoreFile ../android.keystore \
+            --keystorePassword MiNorte2025 \
+            --keyAlias minorte \
+            --keyPassword MiNorte2025
+ 
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: minorte-app
+          path: |
+            ./twa-project/*.apk
+            ./twa-project/*.aab
+          retention-days: 30
+ 
+      - name: Upload Keystore (keep safe!)
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-keystore
+          path: ./twa-project/android.keystore
+          retention-days: 90
+ 
